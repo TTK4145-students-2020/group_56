@@ -15,7 +15,7 @@ func delegateNewOrder(elevID string, buttonPressed <-chan elevio.ButtonEvent){ /
 
 }
 
-func assignNewOrder() // skal ta registrere en ny ordre og finne den beste heisen 
+func assignNewOrder() // skal registrere en ny ordre og finne den beste heisen for denne ordren
 
 for{
     select {

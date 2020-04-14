@@ -7,14 +7,34 @@ import "../timer"
 import "math"
 
 
-func delegateOrder(){
+func delegateNewOrder(elevID string, buttonPressed <-chan elevio.ButtonEvent){ //skal legge til ordren i køen til den valgte heisen
+
+
+
 	
+
+}
+
+func assignNewOrder() // skal ta registrere en ny ordre og finne den beste heisen 
+
+for{
+    select {
+
+    case btn := buttonPressed:
+
+        bestElev := findBestElev(btn, , elevID )
+
+    }
+}
+
+
 
 }
 
 
 
-func findBestElev(btn elevio.ButtonEvent ,elevID string, states map[string]elevator.Elevator  ){
+
+func findBestElev(hallBtn elevio.ButtonEvent ,elevID string, states map[string]elevator.Elevator  ){ //finner den beste heisen ut i fra kostfunksjonen
 
 	lowestCost := math.MaxInt64
 	bestElev := elevID 

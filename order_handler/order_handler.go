@@ -6,28 +6,149 @@ import "../elevator"
 import "../timer"
 import "math"
 
+type ElevQueue struct {
+	QueueSystem [4][4]int
+	CabCall     [4]int
+	HallCall    [4][2]int
+	ID          string
+}
 
-func delegateNewOrder(elevID string, buttonPressed <-chan elevio.ButtonEvent){ //skal legge til ordren i køen til den valgte heisen
+type Order struct {
+    Floor int
+    Button elevio.ButtonType
+    AssignedTo string //hvilken heis som har orderen
+}
+
+type ActiveElevators struct {
+    Elevators []string
+    Connected string
+    Disconnected []string
+}
+
+type Button struct {
+	Floor int
+	Type int //cabcall, hallcallUP eller hallcallDOWN
+}
 
 
+func ReceiveOrder(elevID string, slaveOrder chan<- types.Button){ //skal ta imot en ordre som sendes over nettet fra DelegateOrder
+    netRecv := make(chan Order)
+
+    for {
+        select{
+        case forSlave := <- netRecv:
+
+            slaveOrder <- Button{Floor: forSlave.Floor, Type: int(forSlave.Button)}
+
+            elevio.SetButtonLamp(forSlave.Button, forSlave.Floor, true)
+
+        }
+    }
+
+
+
+}
+
+
+func DelegateOrder(elevID string, masterOrder chan<- types.Button, slaveOrder chan<- types.Button, assignedMasterOrder <-chan Order, assignedSlaveOrder <-chan Order){ //skal sende ordren til den valgte heisen enten lokalt (til master) eller over nettet (til en slave)
+    netSend := make(chan Order) // kan netSend og netReceive være i to forskjellige funksjoner?
+
+    //TODO: legge til hvordan kanalene sendes over nettet
+
+    for{
+
+        select{
+        
+        case toMaster := <- assignedMasterOrder:
+
+            masterOrder <- Button{Floor: toMaster.Floor, Type: int(toMaster.Button)}
+
+            elevio.SetButtonLamp(toMaster.Button, toMaster.Floor, true)
+            
+
+        case toSlave := <- assignedSlaveOrder:
+            netSend <- orderReceived
+            
+
+        }
+
+    }
+
+
+    /*for{
+
+        select{
+        
+        case orderReceived := <- assignedOrder:
+
+            if orderReceived.Button !=2 { //ikke cabcall
+                //TODO: mulig det må legges til litt som gjør at dette alltid fungerer
+                netSend <- orderReceived
+
+            }
+
+            if orderReceived == 2 || assignedOrder.AssignedTo == elevID{// er cabcall
+                masterOrder <- Button{Floor: orderReceived.Floor, Type: int(orderReceived.Button)}
+
+                elevio.SetButtonLamp(orderReceived.Button, orderReceivedFloor, true)
+            }
+        case orderReceived := <- netRecv:
+            elevio.SetButtonLamp(orderReceived.Button, orderReceivedFloor, true)
+            if orderReceived.AssignedTo == elevID {
+				slaveOrder <- Button{Floor: orderReceived.Floor, Type: int(orderReceived.Button)}
+
+        }
+
+    }*/
 
 	
 
 }
 
-func assignNewOrder() // skal registrere en ny ordre og finne den beste heisen for denne ordren
+func AssignNewOrder(masterID string, buttonPressed <- chan elevio.ButtonEvent, allStates <-chan map[string]elevator.Elevator, elevatorUpdate <-chan ActiveElevators, assignedMasterOrder chan Order, assignedSlaveOrder chan Order ) 
+// skal registrere en ny ordre og finne den beste heisen for denne ordren
 
-for{
-    select {
+var activeElevators []string
+var states map[string]elevator.Elevator
 
-    case btn := buttonPressed:
 
-        bestElev := findBestElev(btn, , elevID )
+    for{
+        select {
+
+        case updatedState := <- allStates:
+            states = updatedState
+
+
+        case newElevator := <- elevatorUpdate:
+            activeElevators = newElevator.Elevators
+
+        
+        case btn := <- buttonPressed:
+
+            currentStates := make(map[string]elevator.Elevator)
+
+            for _, id:= range peers {
+                if state, ok:=states[id]; ok {
+                    currentStates[id] = state
+                }
+            }
+        
+        bestElev := findBestElev(btn, elevID, currentStates )
+
+        newOrder := Order{btn.Floor, btn.Button, bestElev}
+        
+        if bestElev == masterID {
+            assignedMasterOrder <- newOrder
+        }
+        if bestElev != masterID {
+            assignedSlaveOrder <- newOrder
+        }
+        
+
+        }
 
     }
 }
-
-
 
 }
 

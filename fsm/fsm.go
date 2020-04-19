@@ -5,9 +5,9 @@ import (
 
 	"../elevator"
 	"../elevio"
+	"../elevstate"
 	"../requests"
 	"../timer"
-	"../elevstate"
 )
 
 var elev elevator.Elevator
@@ -22,6 +22,12 @@ func setAllLights(e elevator.Elevator) {
 			elevio.SetButtonLamp(elevio.ButtonType(btn), f, e.Requests[f][btn])
 		}
 	}
+}
+
+func SetOneLight(btnType int, floor int) {
+
+	elevio.SetButtonLamp(btnType, floor, true)
+
 }
 
 func OnInitBetweenFloors() {
@@ -110,11 +116,11 @@ func OnDoorTimeout() {
 	}
 }
 
-func RestoreState(){
+func RestoreState() {
 	elev = elevstate.StateRestore()
 }
 
-func TransmitState(){
+func TransmitState() {
 	elevstate.StateStore(elev)
 	//fmt.Println("I'm here!")
 	// Transmit json file over network

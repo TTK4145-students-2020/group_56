@@ -5,10 +5,14 @@ import (
 	"time"
 	//"net"
 
-//	"./elevio"
-//	"./fsm"
-//	"./timer"
+	//	"./elevio"
+	//	"./fsm"
+	//	"./timer"
 
+	"flag"
+
+	"./backup"
+	"./chaffeur"
 	"./network"
 	"./elevstate"
 	// "os"
@@ -17,6 +21,80 @@ import (
 	// "strconv"
 	"flag"
 )
+
+var (
+	isBackup    = flag.Bool("backup", false, "Starts process as backup.")
+	primaryPort = flag.Int("cbport", 0, "The port backup should dial to reach primary.")
+	// numFloors = flag.Int("n", 4, "The number of floors.")
+)
+
+type operatingMode int
+
+const (
+	OM_Master operatingMode = iota
+	OM_Slave
+	OM_Independent
+)
+
+func main() {
+	flag.Parse()
+	if *isBackup {
+		backup.AwaitPrimary(*primaryPort)
+	}
+	backup.Launch()
+
+	// Initialisere state, enten fra fil eller fra scratch
+
+	// Lage kanaler for events som main må ta seg av
+	event_switchMode := make(chan operatingMode)
+	event_request := make(chan elevio.ButtonEvent)
+	event_order := make(chan order_handler.Order)
+	event_stateChange := make(chan struct{})
+
+	// Request er ikke delegert, må delegeres av master
+	// Order er delegert av master, må betjenes av heisen
+
+	drv_order := make(chan elevio.ButtonEvent)
+	drv_hallLights := make(chan [4][2]bool)
+
+	// Initialisere nettverk og kjøring av heis
+	go chaffeur.Chaffeur(event_localRequest, event_stateChange, drv_order, drv_hallLights) // ??
+	go network.Network(event_switchMode)                                                   // ??
+
+	// Eller, blokkerende init-funksjoner som selv starter goroutiner ?
+	// For å sikre at modulene er klare før vi begynner på for-select loopen
+
+	// Anta mode independent
+	mode := OM_Independent
+
+	// For select hvor vi tar det som det kommer
+	for {
+		select {
+		case e := <-event_switchMode:
+			mode = e
+		case e := <-event_localRequest:
+			// Hvis cab-call, delegere til seg selv og sende state til network
+			// Hvis hall-call, switch mode
+			switch mode {
+			case OM_Independent:
+				// gi seg selv ordre
+			case OM_Master:
+				// delegere ordre
+			case OM_Slave:
+				// sende til master for delegering
+			}
+		case e := <-event_stateChange:
+			switch mode {
+			case OM_Independent:
+				// ingenting?
+			case OM_Master:
+				// Sende til slaver
+			case OM_Slave:
+				// Sende til master
+			}
+		}
+	}
+}
 
 /*func main() {
 	fmt.Println("Started!")
@@ -60,8 +138,6 @@ import (
 		time.Sleep(20 * time.Millisecond)
 	}
 }*/
-
-
 
 // master test
 /*
@@ -137,10 +213,7 @@ func main(){
 		  }
 		}
 	}
-}
-
-
-
+} */
 
 // Slave test
 

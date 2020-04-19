@@ -16,11 +16,24 @@ func FsmInit() {
 	elev = elevator.Uninitialized()
 }
 
-func setAllLights(e elevator.Elevator) {
+/* func setAllLights(e elevator.Elevator) {
 	for f := 0; f < elevator.NumFloors; f++ {
 		for btn := 0; btn < elevator.NumButtons; btn++ {
 			elevio.SetButtonLamp(elevio.ButtonType(btn), f, e.Requests[f][btn])
 		}
+	}
+} */
+
+func setCabLights(e elevator.Elevator) {
+	for f := 0; f < elevator.NumFloors; f++ {
+		elevio.SetButtonLamp(elevio.BT_Cab, f, e.Requests[f][2])
+	}
+}
+
+func SetHallLights(boolHallLights [4][2]bool) {
+	for f := 0; f < elevator.NumFloors; f++ {
+		elevio.SetButtonLamp(elevio.BT_HallUp, f, boolHallLights[f][0])
+		elevio.SetButtonLamp(elevio.BT_HallDown, f, boolHallLights[f][1])
 	}
 }
 
@@ -36,8 +49,7 @@ func OnInitBetweenFloors() {
 	elev.State = elevator.EBMoving
 }
 
-func OnRequestButtonPress(btnFloor int, btnType elevio.ButtonType) {
-
+func OnNewRequest(btnFloor int, btnType elevio.ButtonType) {
 	switch elev.State {
 
 	case elevator.EBDoorOpen:
@@ -68,7 +80,7 @@ func OnRequestButtonPress(btnFloor int, btnType elevio.ButtonType) {
 		}
 		break
 	}
-	setAllLights(elev)
+	setCabLights(elev)
 }
 
 func OnFloorArrival(newFloor int) {
@@ -84,7 +96,7 @@ func OnFloorArrival(newFloor int) {
 			elevio.SetDoorOpenLamp(true)
 			elev = requests.ClearAtCurrentFloor(elev)
 			timer.Start(elev.Config.DoorOpenDuration)
-			setAllLights(elev)
+			setCabLights(elev)
 			elev.State = elevator.EBDoorOpen
 		}
 		break
@@ -95,7 +107,6 @@ func OnFloorArrival(newFloor int) {
 }
 
 func OnDoorTimeout() {
-
 	switch elev.State {
 
 	case elevator.EBDoorOpen:
@@ -117,11 +128,11 @@ func OnDoorTimeout() {
 }
 
 func RestoreState() {
-	elev = elevstate.StateRestore()
+	elev, _ = elevstate.StateRestore()
 }
 
 func TransmitState() {
-	elevstate.StateStore(elev)
+	elevstate.StateStoreElev(elev)
 	//fmt.Println("I'm here!")
 	// Transmit json file over network
 }

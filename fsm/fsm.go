@@ -131,8 +131,8 @@ func RestoreState() {
 	elev, _ = elevstate.StateRestore()
 }
 
-func TransmitState() {
-	elevstate.StateStoreElev(elev)
+func TransmitState(port string) {
+	elevstate.StateStoreElev(port, elev)
 	//fmt.Println("I'm here!")
 	// Transmit json file over network
 }

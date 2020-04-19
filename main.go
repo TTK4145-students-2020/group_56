@@ -285,6 +285,7 @@ func readData(conn net.TCPConn, data chan<- []byte, readError chan<- error){
 func main(){
 	var port string
 	var priority int
+	var modestr string
 
 	flag.StringVar(&port, "port", ":12345", "This elevator's unique port")
 	flag.IntVar(&priority, "priority", 1, "This elevator's master priority")
@@ -300,18 +301,19 @@ func main(){
 
 	mode := make(chan string)
 	send := make(chan bool)
+	stateReceived := make(chan bool)
 
 	err := elevstate.StateInit(port)
 	if err != nil {
 		return
 	}
 
-	go network.Network(port, priority, mode, send)
+	go network.Network(port, priority, mode, send, stateReceived)
 	for{
 		select{
-		case a := <-mode:
-			fmt.Println("This elevator is now", a)
-			if a == "master" {
+		case modestr = <-mode:
+			fmt.Println("This elevator is now", modestr)
+			if modestr == "master" {
 				err := elevstate.SystemInit()
 				if err != nil {
 					log.Println(err)
@@ -319,7 +321,12 @@ func main(){
 			}
 
 		case <-time.After(1*time.Second):
-			send <-true
+			if (modestr == "slave" || modestr == "master"){
+				go func(){send <-true}()
+			}
+
+		case <-stateReceived:
+			fmt.Println("State Received")
 		}
 	}
 }

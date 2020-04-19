@@ -95,14 +95,11 @@ func Network(port string, priority int, modeChan chan<- string, sigSend <-chan b
 func independentNetwork(port string, IP string, priority int, BCChan chan<- Msgstruct, LChan <-chan Msgstruct, sigSend <-chan bool) (*net.TCPConn, string, string){
 
 	ipmsg				:= make(chan string)
-	// timerreset  := make(chan bool)
-  // timeout     := make(chan bool)
   BCkill		  := make(chan bool)
 	listenkill	:= make(chan bool)
 
 	go broadcast(port, BCChan, BCkill)
 	go listenForMsg(nil, ipmsg, LChan, listenkill)
-	// go timer.NetworkTimer(timerreset, timeout, float64(priority*5))
 
 
 	for{
@@ -110,7 +107,6 @@ func independentNetwork(port string, IP string, priority int, BCChan chan<- Msgs
 			select{
 			case a := <-ipmsg:
 				fmt.Println("Attempting to become slave...")
-				// timerreset <-true
 				start = time.Now()
 				conn, err := slaveConnect(a, port)
 				if err != nil {
@@ -118,7 +114,6 @@ func independentNetwork(port string, IP string, priority int, BCChan chan<- Msgs
 					}else{
 						BCkill <-true
 						listenkill <-true
-						// timerreset <-false
 						return conn, a, "slave"
 					}
 
@@ -142,7 +137,6 @@ func independentNetwork(port string, IP string, priority int, BCChan chan<- Msgs
 		fmt.Println("Resuming independent functions...")
 		go broadcast(port, BCChan, BCkill)
 		go listenForMsg(nil, ipmsg, LChan, listenkill)
-		// go timer.NetworkTimer(timerreset, timeout, float64(20+priority*5))
 
 	}
 
@@ -172,7 +166,6 @@ func masterNetwork(firstConn *net.TCPConn, firstport string, masterIP string, BC
 	for start := time.Now(); time.Since(start) < time.Duration(cycleTime)*time.Millisecond;{
 		select{
 		case a:= <-slaveport:
-			// fmt.Println("Port received:", a)
 			slavemap, newslave = slavemapHandler(slavemap, a)
 			if newslave {
 				go listenForState(slavemap[a].conn, stateReceiver, slavemap[a].killread)
@@ -261,8 +254,6 @@ func broadcast(msg string, bcchan chan<- Msgstruct, kill <-chan bool){
 func listenForMsg(portstr chan<- string, ipstr chan<- string, msgchan <-chan Msgstruct, kill <-chan bool){
 	pending := false
 	for{
-		// mux.Lock()
-		// mux.Unlock()
 		select{
 
 		case <-kill:
@@ -312,15 +303,12 @@ func masterConnAttempt(masterIP string, BCChan chan<- Msgstruct, LChan <-chan Ms
 	for start := time.Now(); time.Since(start) < time.Duration(cycleTime)*time.Millisecond; {
 		select{
 		case a := <-slavePort:
-			// mux.Lock()
 			conn, err := masterTCPConnect(a)
 			if err != nil {
 				log.Println(err)
-				// mux.Unlock()
 			}else{
 				BCkill <-true
 				listenkill <-true
-				// mux.Unlock()
 				return conn, a
 			}
 
@@ -356,7 +344,6 @@ func masterTCPConnect(port string) (*net.TCPConn, error){
   }
 
 	msg := []byte("Connection accepted")
-  //fmt.Println("Connection accepted")
   _, err = conn.Write(msg)
   if err != nil {
     return nil, err
@@ -437,9 +424,6 @@ func slavemapCheckTime(slavemap map[string]slaveConn) (map[string]slaveConn){
 	return slavemap
 }
 
-// To do: legg til mutex, så ikke statefiler skaper problemer (gjør i elevstate)
-// både sendState() og receiveState() bør kjøres som goroutiner,
-// så ikke mutex blokker resten av nettverksmodulen
 func sendState(conn *net.TCPConn, isMaster bool){
 	var toSend []byte
 	var err error
@@ -457,10 +441,6 @@ func sendState(conn *net.TCPConn, isMaster bool){
 			return
 		}
 	}
-	// err = conn.SetWriteDeadline(time.Now().Add(time.Duration(stateDeadline)*time.Second))
-	// if err != nil {
-	// 	log.Println(err)
-	// }
 
 	_, err = conn.Write(toSend)
 	if err != nil {
@@ -503,9 +483,7 @@ func listenForState(conn *net.TCPConn, state chan<- []byte, kill <-chan bool){
 		}
 
 		n, err := conn.Read(buffer)
-		if err != nil {
-			// log.Println(err)
-		}else{
+		if err == nil {
 			if !pending{
 				pending = true
 				go func(){

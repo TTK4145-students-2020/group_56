@@ -58,17 +58,17 @@ func DelegateOrder(elevID string, masterOrder chan<- types.Button, slaveOrder ch
     for{
 
         select{
-
+        
         case toMaster := <- assignedMasterOrder:
 
             masterOrder <- Button{Floor: toMaster.Floor, Type: int(toMaster.Button)}
 
             elevio.SetButtonLamp(toMaster.Button, toMaster.Floor, true)
-
+            
 
         case toSlave := <- assignedSlaveOrder:
             netSend <- orderReceived
-
+            
 
         }
 
@@ -78,7 +78,7 @@ func DelegateOrder(elevID string, masterOrder chan<- types.Button, slaveOrder ch
     /*for{
 
         select{
-
+        
         case orderReceived := <- assignedOrder:
 
             if orderReceived.Button !=2 { //ikke cabcall
@@ -101,11 +101,11 @@ func DelegateOrder(elevID string, masterOrder chan<- types.Button, slaveOrder ch
 
     }*/
 
-
+	
 
 }
 
-func AssignNewOrder(masterID string, buttonPressed <- chan elevio.ButtonEvent, allStates <-chan map[string]elevator.Elevator, elevatorUpdate <-chan ActiveElevators, assignedMasterOrder chan Order, assignedSlaveOrder chan Order )
+func AssignNewOrder(masterID string, buttonPressed <- chan elevio.ButtonEvent, allStates <-chan map[string]elevator.Elevator, elevatorUpdate <-chan ActiveElevators, assignedMasterOrder chan Order, assignedSlaveOrder chan Order ) 
 // skal registrere en ny ordre og finne den beste heisen for denne ordren
 
 var activeElevators []string
@@ -122,7 +122,7 @@ var states map[string]elevator.Elevator
         case newElevator := <- elevatorUpdate:
             activeElevators = newElevator.Elevators
 
-
+        
         case btn := <- buttonPressed:
 
             currentStates := make(map[string]elevator.Elevator)
@@ -132,18 +132,18 @@ var states map[string]elevator.Elevator
                     currentStates[id] = state
                 }
             }
-
+        
         bestElev := findBestElev(btn, elevID, currentStates )
 
         newOrder := Order{btn.Floor, btn.Button, bestElev}
-
+        
         if bestElev == masterID {
             assignedMasterOrder <- newOrder
         }
         if bestElev != masterID {
             assignedSlaveOrder <- newOrder
         }
-
+        
 
         }
 
@@ -158,7 +158,7 @@ var states map[string]elevator.Elevator
 func findBestElev(hallBtn elevio.ButtonEvent ,elevID string, states map[string]elevator.Elevator  ){ //finner den beste heisen ut i fra kostfunksjonen
 
 	lowestCost := math.MaxInt64
-	bestElev := elevID
+	bestElev := elevID 
 
 	for id, state := range states {//går gjennom alle states til hver elevID
         state.Requests[btn.Floor][btn.Button] = 2
@@ -181,12 +181,12 @@ func elevResponseTime(e elevator.Elevator) int {//finner tiden det tar før heis
     D_Stop := elevio.MD_Stop
 
     duration := 0;
-
+    
     switch e.behaviour {
     case elevator.EB_Idle:
         e.dirn = requests_chooseDirection(e);
         if(e.dirn == D_Stop){
-            return duration; //returnerer fordi heisen idle = "fri"
+            return duration; //returnerer fordi heisen idle = "fri" 
         }
         break;
 
@@ -213,3 +213,4 @@ func elevResponseTime(e elevator.Elevator) int {//finner tiden det tar før heis
         duration += TRAVEL_TIME;
     }
 }
+

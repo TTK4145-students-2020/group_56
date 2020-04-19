@@ -1,5 +1,8 @@
 package main
 
+// TODO: endre navn fra requests til orders i elevator/elevator.go
+// TODO: muligens endre navn på elevstate.og til noe minnegreier
+
 import (
 	 "fmt"
 	"time"

@@ -213,7 +213,7 @@ func main(){
 		  }
 		}
 	}
-} */
+}
 
 // Slave test
 
@@ -280,7 +280,7 @@ func readData(conn net.TCPConn, data chan<- []byte, readError chan<- error){
 		}
 	}
 }
-*/
+
 
 func main(){
 	var port string
@@ -330,3 +330,4 @@ func main(){
 		}
 	}
 }
+*/

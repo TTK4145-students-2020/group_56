@@ -1,16 +1,19 @@
 package elevstate
 
+//  TODO: legge til funksjonalitet for å oppdatere (dersom nødvendig) posisjon ved omstart
+//  TODO: legge til funksjon for initialisering av systemstate hos master
+
 import (
-  "log"
   "os"
   "encoding/json"
   "io/ioutil"
+  "bytes"
 
   "../elevator"
   "../elevio"
 
-  //"strconv"
-  "fmt"
+  "sync"
+  // "fmt"
 )
 
 type System struct{
@@ -24,9 +27,44 @@ type State struct{
   Requests  [4][3]bool `json:"Requests"`
 }
 
-func StateStoreElev(e elevator.Elevator){
+var mux sync.Mutex
+
+const statepath = "./elevstate/state.json"
+const syspath = "./elevstate/systemState.json"
+
+// Must be called from main, updates or generates state
+func StateInit(port string) (error) {
+  var requests [4][3]bool
+  for i := 0; i < 4; i++ {
+    for j := 0; j < 3; j++ {
+      requests[i][j] = false
+    }
+  }
+
   state := State{
-    ID: "xxx.xxx.xxx.xxx",//?
+    ID: port,
+    Floor: -1,
+    Dirn: "",
+    Requests: requests,
+  }
+
+  err := genStateFile(state)
+  return err
+}
+
+func SystemInit() (error) {
+  statebytes, err := RetrieveStateBytes()
+  if err != nil {
+    return err
+  }
+
+  return SystemStateUpdate(statebytes)
+}
+
+// stores e as a state.Json file
+func StateStoreElev(port string, e elevator.Elevator) (error){
+  state := State{
+    ID: port,
     Floor: e.Floor,
     Dirn: dirToString(e.Dirn),
     Requests: e.Requests,
@@ -35,62 +73,61 @@ func StateStoreElev(e elevator.Elevator){
   var jsonData []byte
   jsonData, err := json.Marshal(state)
   if err != nil {
-      log.Println(err)
+      return err
   }
-  err = ioutil.WriteFile("state.json", jsonData, 0644)
-  if err != nil {
-      log.Println(err)
-  }
+
+  mux.Lock()
+  err = ioutil.WriteFile(statepath, jsonData, 0644)
+  mux.Unlock()
+  return err
 }
 
+// stores state (State struct as byte-array) in file state.Json
 func StateStore(state []byte) (err error){
-  err = ioutil.WriteFile("state.json", state, 0644)
+  mux.Lock()
+  err = ioutil.WriteFile(statepath, state, 0644)
+  mux.Unlock()
   return
 }
 
+// stores system (System struct as byte-array) in file system.json
 func SystemStore(system []byte) (err error){
-  err = ioutil.WriteFile("systemState.json", system, 0644)
+  mux.Lock()
+  err = ioutil.WriteFile(syspath, system, 0644)
+  mux.Unlock()
   return
 }
 
-func SystemStateUpdate(statebytes []byte) (err error){
+// Adds/updates single elevator (statebytes) in systemstate.json
+func SystemStateUpdate(statebytes []byte) (error){
   var state State
   var system System
 
-  fmt.Println("før unmarshal")
-  err = json.Unmarshal(statebytes, &state)
+  err := json.Unmarshal(statebytes, &state)
   if err!= nil {
-    return
+    return err
   }
-  fmt.Println("etter unmarshal")
 
-  jsonFile, err := os.Open("systemState.json")
+  mux.Lock()
+  jsonFile, err := os.Open(syspath)
   if err != nil {
-      //return
-      system = System{
-        states: []State{state},
-      }
-      //system.states = append(system.states, state)
-      var systembytes []byte
-      systembytes, err = json.Marshal(system)
-      if err != nil{
-        return
-      }
-
-      err = SystemStore(systembytes)
-      return
-
+      mux.Unlock()
+      return genSystemFile(System{[]State{state}})
   }
 
   systembytes, err := ioutil.ReadAll(jsonFile)
   if err != nil {
-      return
+      jsonFile.Close()
+      mux.Unlock()
+      return err
   }
   jsonFile.Close()
+  mux.Unlock()
 
-  err = json.Unmarshal(systembytes, &system)
+  // err = json.Unmarshal(systembytes, &system)
+  system = unmarshalSystem(systembytes)
   if err != nil {
-      return
+      return err
   }
 
   existance := false
@@ -104,31 +141,40 @@ func SystemStateUpdate(statebytes []byte) (err error){
     system.states = append(system.states, state)
   }
 
-  systembytes, err = json.Marshal(system)
+  // systembytes, err = json.Marshal(system)
+  systembytes = marshalSystem(system)
   if err != nil {
-      return
+      return err
   }
 
   err = SystemStore(systembytes)
-  return
+  return err
 }
 
-func StateRestore() (e elevator.Elevator){
-  jsonFile, err := os.Open("state.json")
-  if err != nil {
-      log.Println(err)
-  }
-  defer jsonFile.Close()
+// Reads state.json and returns as Elevator struct
+func StateRestore() (elevator.Elevator, error) {
+  var e elevator.Elevator
 
-  var state State
+  mux.Lock()
+  jsonFile, err := os.Open(statepath)
+  if err != nil {
+    mux.Unlock()
+    return e, err
+  }
+
   statebytes, err := ioutil.ReadAll(jsonFile)
   if err != nil {
-      log.Println(err)
+    jsonFile.Close()
+    mux.Unlock()
+    return e, err
   }
+  jsonFile.Close()
+  mux.Unlock()
 
+  var state State
   err = json.Unmarshal(statebytes, &state)
   if err != nil {
-      log.Println(err)
+      return e, err
   }
 
   e.Floor = state.Floor
@@ -137,7 +183,7 @@ func StateRestore() (e elevator.Elevator){
   e.State = elevator.EBIdle
   e.Config.ClearRequestVariant = elevator.CVALL
 	e.Config.DoorOpenDuration = 3
-  return
+  return e, nil
 }
 
 func dirToString(dirn elevio.MotorDirection) (dirnS string){
@@ -170,72 +216,164 @@ func stringToDir(dirnS string) (dirn elevio.MotorDirection){
   return
 }
 
-func RetrieveStateBytes() (statebytes []byte, err error){
-  jsonFile, err := os.Open("state.json")
+// Reads state.json and returns as State struct (in byte-array form)
+func RetrieveStateBytes() ([]byte, error){
+  mux.Lock()
+  jsonFile, err := os.Open(statepath)
   if err != nil {
-      //log.Println(err)
-      statebytes = nil
-      return
-  }
-  defer jsonFile.Close()
-
-  statebytes, err = ioutil.ReadAll(jsonFile)
-  if err != nil {
-      //log.Println(err)
-      statebytes = nil
-      return
+      mux.Unlock()
+      return nil, err
   }
 
-  return
+  statebytes, err := ioutil.ReadAll(jsonFile)
+  jsonFile.Close()
+  mux.Unlock()
+  if err != nil {
+      return nil, err
+  }
+
+  return statebytes, nil
 }
 
-func RetrieveSystemStateBytes() (statebytes []byte, err error){
-  jsonFile, err := os.Open("systemState.json")
+// Reads system.json and returns as System struct (in byte-array form)
+func RetrieveSystemStateBytes() ([]byte, error){
+  mux.Lock()
+  jsonFile, err := os.Open(syspath)
   if err != nil {
-      //log.Println(err)
-      statebytes = nil
-      return
-  }
-  defer jsonFile.Close()
-
-  statebytes, err = ioutil.ReadAll(jsonFile)
-  if err != nil {
-      //log.Println(err)
-      statebytes = nil
-      return
+      mux.Unlock()
+      return nil, err
   }
 
-  return
+  statebytes, err := ioutil.ReadAll(jsonFile)
+  jsonFile.Close()
+  mux.Unlock()
+  if err != nil {
+      return nil, err
+  }
+
+  return statebytes, nil
 }
 
 //returns the statebytes of the elevator connected on port port, nil if error occurs or no elevator connected on port.
-func RetrieveRemoteStateBytes(port string) (statebytes []byte, err error){
-  jsonFile, err := os.Open("systemState.json")
+func RetrieveRemoteStateBytes(port string) ([]byte, error){
+  mux.Lock()
+  jsonFile, err := os.Open(syspath)
   if err != nil {
-      statebytes = nil
-      return
+      mux.Unlock()
+      return nil, err
   }
-  defer jsonFile.Close()
 
   systembytes, err := ioutil.ReadAll(jsonFile)
+  jsonFile.Close()
+  mux.Unlock()
   if err != nil {
-      statebytes = nil
-      return
+      return nil, err
   }
-  var system System
-  err = json.Unmarshal(systembytes, &system)
-  if err != nil {
-      statebytes = nil
-      return
-  }
+
+  // var system System
+  // err = json.Unmarshal(systembytes, &system)
+  system := unmarshalSystem(systembytes)
+  // if err != nil {
+  //     return nil, err
+  // }
   for i := 0; i < len(system.states); i++ {
     if(system.states[i].ID == port){
-      statebytes, err = json.Marshal(system.states[i])
-      return
+      statebytes, err := json.Marshal(system.states[i])
+      return statebytes, err
     }
   }
-  statebytes = nil
-  return
+  return nil, nil
+}
+
+func genSystemFile(system System) (error){
+  mux.Lock()
+  file, err := os.Open(syspath)
+  if err != nil {
+    mux.Unlock()
+    var systembytes []byte
+    systembytes = marshalSystem(system)
+    err = SystemStore(systembytes)
+    if err != nil {
+      return err
+    }
+    return nil
+  }
+
+  file.Close()
+  mux.Unlock()
+  return nil
+}
+
+func genStateFile(state State) (error){
+  existance  := true
+  var statebytes []byte
+  var err error
+
+  mux.Lock()
+  jsonFile, err := os.Open(statepath)
+  if err != nil {
+    mux.Unlock()
+    existance = false
+  }else{
+    statebytes, err = ioutil.ReadAll(jsonFile)
+    jsonFile.Close()
+    mux.Unlock()
+    if err != nil {
+      existance = false
+    }
+  }
+
+  if existance {
+    var oldstate State
+    err = json.Unmarshal(statebytes, &oldstate)
+    if err != nil {
+      return err
+    }
+    oldstate.ID = state.ID
+    statebytes, err := json.Marshal(oldstate)
+    if err != nil {
+      return err
+    }
+
+    err = StateStore(statebytes)
+    return err
+
+  }else{
+    var statebytes []byte
+    statebytes, err = json.Marshal(state)
+    if err != nil{
+      return err
+    }
+    err = StateStore(statebytes)
+    return err
+  }
+
+  return nil
+}
+
+func marshalSystem(system System) ([]byte) {
+  var systemBytes []byte
+  for i := 0; i < len(system.states); i++ {
+    statebytes, err := json.Marshal(system.states[i])
+    if err == nil {
+      systemBytes = append(systemBytes, statebytes...)
+      systemBytes = append(systemBytes, []byte("||")...)
+    }
+  }
+  return systemBytes
+}
+func unmarshalSystem(systemBytes []byte) (System){
+  var system System
+  allstates := bytes.Split(systemBytes, []byte("||"))
+
+  for i := 0; i < len(allstates); i++ {
+    var state State
+    err := json.Unmarshal(allstates[i], &state)
+    if err == nil {
+      system.states = append(system.states, state)
+    }
+  }
+  return system
 }
 
 /*

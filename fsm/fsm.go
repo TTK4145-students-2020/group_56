@@ -37,6 +37,12 @@ func SetHallLights(boolHallLights [4][2]bool) {
 	}
 }
 
+func SetOneLight(btnType int, floor int) {
+
+	elevio.SetButtonLamp(btnType, floor, true)
+
+}
+
 func OnInitBetweenFloors() {
 	elevio.SetMotorDirection(elevio.MD_Down)
 	elev.Dirn = elevio.MD_Down
@@ -122,7 +128,7 @@ func OnDoorTimeout() {
 }
 
 func RestoreState() {
-	elev = elevstate.StateRestore()
+	elev, _ = elevstate.StateRestore()
 }
 
 func TransmitState() {

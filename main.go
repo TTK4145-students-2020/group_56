@@ -1,7 +1,8 @@
 package main
 
 import (
-
+	 "fmt"
+	"time"
 	//"net"
 
 	//	"./elevio"
@@ -13,6 +14,12 @@ import (
 	"./backup"
 	"./chaffeur"
 	"./network"
+	"./elevstate"
+	// "os"
+	// "io/ioutil"
+	"log"
+	// "strconv"
+	"flag"
 )
 
 var (
@@ -133,8 +140,8 @@ func main() {
 }*/
 
 // master test
-
-/* func main(){
+/*
+func main(){
 	MasterIP := "192.168.180.127"
 	BCPort := ":12345"
 	listenport := ":12346"
@@ -209,7 +216,7 @@ func main() {
 } */
 
 // Slave test
-/*
+
 func main(){
 	//MyIP := "192.168.180.127"
 	MyPort := ":12347"
@@ -274,3 +281,45 @@ func readData(conn net.TCPConn, data chan<- []byte, readError chan<- error){
 	}
 }
 */
+
+func main(){
+	var port string
+	var priority int
+
+	flag.StringVar(&port, "port", ":12345", "This elevator's unique port")
+	flag.IntVar(&priority, "priority", 1, "This elevator's master priority")
+	flag.Parse()
+
+	if port[0] != ':' {
+		port = ":"+port
+	}
+	if len(port) > 6 {
+		log.Println("Error: Invalid port")
+		return
+	}
+
+	mode := make(chan string)
+	send := make(chan bool)
+
+	err := elevstate.StateInit(port)
+	if err != nil {
+		return
+	}
+
+	go network.Network(port, priority, mode, send)
+	for{
+		select{
+		case a := <-mode:
+			fmt.Println("This elevator is now", a)
+			if a == "master" {
+				err := elevstate.SystemInit()
+				if err != nil {
+					log.Println(err)
+				}
+			}
+
+		case <-time.After(1*time.Second):
+			send <-true
+		}
+	}
+}

@@ -399,7 +399,7 @@ func UnmarshalSystem(systemBytes []byte) (System){
 
   var lights Lights
   json.Unmarshal(allstates[0], &lights)
-  
+
 
   system.HallLights = lights.HallLights
 
@@ -426,6 +426,12 @@ func RetrieveState() (State, error){
   err = json.Unmarshal(statebytes, &state)
   return state, err
 
+}
+
+func StateFromBytes(statebytes []byte) (State, error){
+  var state State
+  err := json.Unmarshal(statebytes, &state)
+  return state, err
 }
 
 /*

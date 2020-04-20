@@ -44,7 +44,7 @@ func Chaffeur(event_localRequest chan<- elevio.ButtonEvent, event_stateChange ch
 		}
 
 		fsm.TransmitState()
-		event_stateChange <- struct{}{}
+		go func(){event_stateChange <- struct{}{}}()
 
 		time.Sleep(20 * time.Millisecond)
 	}

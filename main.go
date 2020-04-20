@@ -10,7 +10,7 @@ package main
 
 import (
 	 "fmt"
-	// "time"
+	"time"
 	//"net"
 
 		"./elevio"
@@ -99,6 +99,9 @@ func main() {
       case network.OM_Independent:
         fsm.IndependentLights()
          // Legge inn hallCalls i Requests basert på HallLights
+
+			 default:
+				 break
       }
 
 		case e := <-event_localRequest:
@@ -202,21 +205,22 @@ func main() {
             log.Println(err)
             break
           }
-
+					fmt.Println(systemState)
           newOrders, hallLights, err:= order_handler.HandleSystemStateFromMaster(systemState)
 					if err != nil {
 						log.Println(err)
 					}
-
           drv_hallLights <- hallLights
 
           for _, order := range newOrders {
             drv_order <- order
           }
 
+
         default:
           break
         }
 		}
+		time.Sleep(10*time.Millisecond)
 	}
 }

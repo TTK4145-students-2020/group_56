@@ -114,7 +114,7 @@ func independentNetwork(port string, IP string, priority int, BCChan chan<- Msgs
 		for start := time.Now(); time.Since(start) < time.Duration(priority*cycleTime)*time.Millisecond; {
 			select{
 			case a := <-ipmsg:
-				fmt.Println("Attempting to become slave...")
+				// fmt.Println("Attempting to become slave...")
 				start = time.Now()
 				conn, err := slaveConnect(a, port)
 				if err != nil {
@@ -132,17 +132,17 @@ func independentNetwork(port string, IP string, priority int, BCChan chan<- Msgs
 				break
 			}
 		}
-		fmt.Println("Attempting to become master...")
+		// fmt.Println("Attempting to become master...")
 		BCkill <-true
 		listenkill <-true
 		conn, slaveport := masterConnAttempt(IP, BCChan, LChan)
 		if conn == nil {
-			fmt.Println("Master connection attempt failed!")
+			// fmt.Println("Master connection attempt failed!")
 		}else{
-			fmt.Println("Master connection attempt succeeded!")
+			// fmt.Println("Master connection attempt succeeded!")
 			return conn, slaveport, OM_Master
 		}
-		fmt.Println("Resuming independent functions...")
+		// fmt.Println("Resuming independent functions...")
 		go broadcast(port, BCChan, BCkill)
 		go listenForMsg(nil, ipmsg, LChan, listenkill)
 

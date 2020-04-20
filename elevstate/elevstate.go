@@ -117,9 +117,12 @@ func StateStore(state []byte) (err error){
 }
 
 // stores system (System struct as byte-array) in file system.json
-func SystemStore(system []byte) (err error){
+func SystemStore(system System) (err error){
+
+  systembytes := marshalSystem(system)
+
   mux.Lock()
-  err = ioutil.WriteFile(syspath, system, 0644)
+  err = ioutil.WriteFile(syspath, systembytes, 0644)
   mux.Unlock()
   return
 }
@@ -150,7 +153,6 @@ func SystemStateUpdate(statebytes []byte) (error){
   jsonFile.Close()
   mux.Unlock()
 
-  // err = json.Unmarshal(systembytes, &system)
   system = unmarshalSystem(systembytes)
   if err != nil {
       return err
@@ -167,13 +169,7 @@ func SystemStateUpdate(statebytes []byte) (error){
     system.states = append(system.states, state)
   }
 
-  // systembytes, err = json.Marshal(system)
-  systembytes = marshalSystem(system)
-  if err != nil {
-      return err
-  }
-
-  err = SystemStore(systembytes)
+  err = SystemStore(system)
   return err
 }
 
@@ -316,9 +312,7 @@ func genSystemFile(system System) (error){
   file, err := os.Open(syspath)
   if err != nil {
     mux.Unlock()
-    var systembytes []byte
-    systembytes = marshalSystem(system)
-    err = SystemStore(systembytes)
+    err = SystemStore(system)
     if err != nil {
       return err
     }

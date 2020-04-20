@@ -113,15 +113,20 @@ func StateStoreElev(e elevator.Elevator, newRequests []elevio.ButtonEvent) (erro
   return err
 }
 
-// stores state (State struct as byte-array) in file state.Json
-func StateStore(state []byte) (err error){
+// stores state in file state.Json
+func StateStore(state State) (error){
+
+  statebytes, err := json.Marshal(state)
+  if err != nil{
+    return err
+  }
   mux.Lock()
-  err = ioutil.WriteFile(statepath, state, 0644)
+  err = ioutil.WriteFile(statepath, statebytes, 0644)
   mux.Unlock()
-  return
+  return err
 }
 
-// stores system (System struct as byte-array) in file system.json
+// stores system in file system.json
 func SystemStore(system System) (err error){
 
   systembytes := marshalSystem(system)
@@ -191,13 +196,11 @@ func StateRestore() (elevator.Elevator, error) {
   }
 
   statebytes, err := ioutil.ReadAll(jsonFile)
-  if err != nil {
-    jsonFile.Close()
-    mux.Unlock()
-    return e, err
-  }
   jsonFile.Close()
   mux.Unlock()
+  if err != nil {
+    return e, err
+  }
 
   var state State
   err = json.Unmarshal(statebytes, &state)
@@ -356,21 +359,12 @@ func genStateFile(state State) (error){
       return err
     }
     oldstate.ID = state.ID
-    statebytes, err := json.Marshal(oldstate)
-    if err != nil {
-      return err
-    }
 
-    err = StateStore(statebytes)
+    err = StateStore(oldstate)
     return err
 
   }else{
-    var statebytes []byte
-    statebytes, err = json.Marshal(state)
-    if err != nil{
-      return err
-    }
-    err = StateStore(statebytes)
+    err = StateStore(state)
     return err
   }
 
@@ -399,7 +393,7 @@ func UnmarshalSystem(systemBytes []byte) (System){
 
   var lights Lights
   json.Unmarshal(allstates[0], &lights)
-  
+
 
   system.HallLights = lights.HallLights
 
@@ -426,6 +420,12 @@ func RetrieveState() (State, error){
   err = json.Unmarshal(statebytes, &state)
   return state, err
 
+}
+
+func StateFromBytes(statebytes []byte) (State, error){
+  var state State
+  err := json.Unmarshal(statebytes, &state)
+  return state, err
 }
 
 /*

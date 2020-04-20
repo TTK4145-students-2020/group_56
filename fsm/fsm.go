@@ -14,6 +14,11 @@ var elev elevator.Elevator
 
 func FsmInit() {
 	elev = elevator.Uninitialized()
+	oldElev, err := elevstate.StateRestore()
+	if err != nil {
+		return
+	}
+	elev.Requests = oldElev.Requests
 }
 
 /* func setAllLights(e elevator.Elevator) {
@@ -23,6 +28,14 @@ func FsmInit() {
 		}
 	}
 } */
+
+func IndependentLights() {
+	for f := 0; f < elevator.NumFloors; f++ {
+		for btn := 0; btn < elevator.NumButtons; btn++ {
+			elevio.SetButtonLamp(elevio.ButtonType(btn), f, elev.Requests[f][btn])
+		}
+	}
+}
 
 func setCabLights(e elevator.Elevator) {
 	for f := 0; f < elevator.NumFloors; f++ {
@@ -127,12 +140,12 @@ func OnDoorTimeout() {
 	}
 }
 
-func RestoreState() {
-	elev, _ = elevstate.StateRestore()
-}
+// func RestoreState() {
+// 	elev, _ = elevstate.StateRestore()
+// }
 
-func TransmitState(port string) {
-	elevstate.StateStoreElev(port, elev)
+func TransmitState() {
+	elevstate.StateStoreElev(elev, nil)
 	//fmt.Println("I'm here!")
 	// Transmit json file over network
 }

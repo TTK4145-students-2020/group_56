@@ -153,7 +153,7 @@ func SystemStateUpdate(statebytes []byte) (error){
   jsonFile.Close()
   mux.Unlock()
 
-  system = unmarshalSystem(systembytes)
+  system = UnmarshalSystem(systembytes)
   if err != nil {
       return err
   }
@@ -294,7 +294,7 @@ func RetrieveRemoteStateBytes(port string) ([]byte, error){
 
   // var system System
   // err = json.Unmarshal(systembytes, &system)
-  system := unmarshalSystem(systembytes)
+  system := UnmarshalSystem(systembytes)
   // if err != nil {
   //     return nil, err
   // }
@@ -383,7 +383,7 @@ func marshalSystem(system System) ([]byte) {
   return systemBytes
 }
 
-func unmarshalSystem(systemBytes []byte) (System){
+func UnmarshalSystem(systemBytes []byte) (System){
   var system System
   allstates := bytes.Split(systemBytes, []byte("||"))
 
@@ -399,7 +399,7 @@ func unmarshalSystem(systemBytes []byte) (System){
 
 func RetrieveSystemState() (System, error){
   systembytes, err := RetrieveSystemStateBytes()
-  system := unmarshalSystem(systembytes)
+  system := UnmarshalSystem(systembytes)
   return system, err
 
 }

@@ -384,6 +384,9 @@ func main() {
 				default:
 					break
 				}
+
+			default:
+				break
 			}
 		}
 		send <-true

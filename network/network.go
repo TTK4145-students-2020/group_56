@@ -460,7 +460,8 @@ func ReceiveState(state []byte, isMaster bool){
 		}
 	}else{
 		// Slave stores entire system state
-		err := elevstate.SystemStore(state)
+		system := elevstate.UnmarshalSystem(state)
+		err := elevstate.SystemStore(system)
 		if err != nil {
 			log.Println(err)
 		}

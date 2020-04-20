@@ -30,6 +30,14 @@ type slaveConn struct{
 	killread chan bool
 }
 
+type OperatingMode int
+
+const (
+	OM_Master OperatingMode = iota
+	OM_Slave
+	OM_Independent
+)
+
 const stringLengthIP = 15
 const stringLengthPort = 6
 
@@ -44,9 +52,9 @@ const bcPort = 15657
 
 //var mux sync.Mutex
 
-func Network(port string, priority int, modeChan chan<- string, sigSend <-chan bool, sigReceived chan<-[]byte){
+func Network(port string, priority int, modeChan chan<- OperatingMode, sigSend <-chan bool, sigReceived chan<-[]byte){
 	var conn *net.TCPConn
-	var mode string
+	var mode OperatingMode
 	var IPorPort string
 
 	myIP, err := localip.LocalIP()
@@ -72,13 +80,13 @@ func Network(port string, priority int, modeChan chan<- string, sigSend <-chan b
 		}
 
 		switch(mode){
-		case "slave":
+		case OM_Slave:
 			masterIP := IPorPort
 			mode = slaveNetwork(conn, port, masterIP, BCChan, LChan, sigSend, sigReceived)
 			modeChan <-mode
 			break
 
-		case "master":
+		case OM_Master:
 			firstslaveport := IPorPort
 			mode = masterNetwork(conn, firstslaveport, myIP, BCChan, LChan, sigSend, sigReceived)
 			modeChan <-mode
@@ -92,8 +100,7 @@ func Network(port string, priority int, modeChan chan<- string, sigSend <-chan b
 	}
 }
 
-
-func independentNetwork(port string, IP string, priority int, BCChan chan<- Msgstruct, LChan <-chan Msgstruct, sigSend <-chan bool) (*net.TCPConn, string, string){
+func independentNetwork(port string, IP string, priority int, BCChan chan<- Msgstruct, LChan <-chan Msgstruct, sigSend <-chan bool) (*net.TCPConn, string, OperatingMode){
 
 	ipmsg				:= make(chan string)
   BCkill		  := make(chan bool)
@@ -115,7 +122,7 @@ func independentNetwork(port string, IP string, priority int, BCChan chan<- Msgs
 					}else{
 						BCkill <-true
 						listenkill <-true
-						return conn, a, "slave"
+						return conn, a, OM_Slave
 					}
 
 			// Just in case
@@ -133,7 +140,7 @@ func independentNetwork(port string, IP string, priority int, BCChan chan<- Msgs
 			fmt.Println("Master connection attempt failed!")
 		}else{
 			fmt.Println("Master connection attempt succeeded!")
-			return conn, slaveport, "master"
+			return conn, slaveport, OM_Master
 		}
 		fmt.Println("Resuming independent functions...")
 		go broadcast(port, BCChan, BCkill)
@@ -143,7 +150,7 @@ func independentNetwork(port string, IP string, priority int, BCChan chan<- Msgs
 
 }
 
-func masterNetwork(firstConn *net.TCPConn, firstport string, masterIP string, BCChan chan<- Msgstruct, LChan <-chan Msgstruct, sigSend <-chan bool, sigReceived chan<-[]byte) (string){
+func masterNetwork(firstConn *net.TCPConn, firstport string, masterIP string, BCChan chan<- Msgstruct, LChan <-chan Msgstruct, sigSend <-chan bool, sigReceived chan<-[]byte) (OperatingMode){
 	slavemap := make(map[string]slaveConn)
 
 	var  firstslave slaveConn
@@ -198,10 +205,10 @@ func masterNetwork(firstConn *net.TCPConn, firstport string, masterIP string, BC
 	}
 	BCkill <-true
 	listenkill <-true
-	return "independent"
+	return OM_Independent
 }
 
-func slaveNetwork(conn *net.TCPConn, port string, masterIP string, BCChan chan<- Msgstruct, LChan <-chan Msgstruct, sigSend <-chan bool, sigReceived chan<-[]byte) (string){
+func slaveNetwork(conn *net.TCPConn, port string, masterIP string, BCChan chan<- Msgstruct, LChan <-chan Msgstruct, sigSend <-chan bool, sigReceived chan<-[]byte) (OperatingMode){
 	// stateReceiver 	:= make(chan []byte, 2)
 	ipmsg 					:= make(chan string)
 	BCkill 					:= make(chan bool)
@@ -237,7 +244,7 @@ func slaveNetwork(conn *net.TCPConn, port string, masterIP string, BCChan chan<-
 	listenkill <-true
 	readkill <-true
 	conn.Close()
-	return "independent"
+	return OM_Independent
 }
 
 func broadcast(msg string, bcchan chan<- Msgstruct, kill <-chan bool){

@@ -8,7 +8,7 @@ import (
 	"time"
 	//"net"
 
-	//	"./elevio"
+		"./elevio"
 	//	"./fsm"
 	//	"./timer"
 
@@ -389,7 +389,19 @@ func main() {
 				break
 			}
 		}
-		send <-true
+
+		elev, err := elevstate.StateRestore()
+		if err != nil {
+			log.Println(err)
+		}else{
+			newRequests := []elevio.ButtonEvent{{1,elevio.BT_HallUp},{2, elevio.BT_HallDown}}
+			err = elevstate.StateStoreElev(elev, newRequests)
+			if err != nil {
+				log.Println(err)
+			}else{
+				send <-true
+			}
+		}
 		fmt.Println(mode)
 	}
 }

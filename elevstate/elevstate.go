@@ -15,9 +15,14 @@ import (
   "sync"
   // "fmt"
 )
+type Lights struct{
+  HallLights [4][2]bool `json:"Lights"`
+}
+
 
 type System struct{
-    states []State `json:"States"`
+  HallLights [4][2]bool
+  states []State `json:"States"`
 }
 
 // legg til neworders og unassignedrequests (type: elevio.buttonevent)
@@ -141,7 +146,8 @@ func SystemStateUpdate(statebytes []byte) (error){
   jsonFile, err := os.Open(syspath)
   if err != nil {
       mux.Unlock()
-      return genSystemFile(System{[]State{state}})
+      var hallLights [4][2]bool
+      return genSystemFile(System{hallLights, []State{state}})
   }
 
   systembytes, err := ioutil.ReadAll(jsonFile)
@@ -373,6 +379,10 @@ func genStateFile(state State) (error){
 
 func marshalSystem(system System) ([]byte) {
   var systemBytes []byte
+
+  systemBytes, _ = json.Marshal(Lights{system.HallLights})
+  systemBytes = append(systemBytes, []byte("||")...)
+
   for i := 0; i < len(system.states); i++ {
     statebytes, err := json.Marshal(system.states[i])
     if err == nil {
@@ -387,7 +397,13 @@ func UnmarshalSystem(systemBytes []byte) (System){
   var system System
   allstates := bytes.Split(systemBytes, []byte("||"))
 
-  for i := 0; i < len(allstates); i++ {
+  var lights Lights
+  json.Unmarshal(allstates[0], &lights)
+  
+
+  system.HallLights = lights.HallLights
+
+  for i := 1; i < len(allstates); i++ {
     var state State
     err := json.Unmarshal(allstates[i], &state)
     if err == nil {

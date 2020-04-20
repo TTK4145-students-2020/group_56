@@ -96,6 +96,7 @@ func GetHallLights(systemState elevstate.System) (hallLights [4][2]bool) {
 			hallLights[nor.Floor][nor.Button] = true
 		}
 	}
+	return
 }
 
 // ta inn staten til slaven som string (json), cleare newOrder i SystemState.json, se etter unassigned hos alle slaver
@@ -121,8 +122,8 @@ func HandleStateFromSlave(slaveState elevstate.State) (unassignedRequests []elev
 	}
 
 	// Clearer de newOrder-ene (fra system) som slave har sett
-	for j, r1 := range slaveState.NewOrders {
-		for i, r2 := range systemState.States[j].NewOrders {
+	for _, r1 := range slaveState.NewOrders {
+		for i, r2 := range systemState.States[systemIndex].NewOrders {
 			if r1.Floor == r2.Floor && r1.Button == r2.Button {
 				// Slette ett element på index i
 				systemState.States[systemIndex].NewOrders = append(systemState.States[systemIndex].NewOrders[:i], systemState.States[systemIndex].NewOrders[i+1:]...)

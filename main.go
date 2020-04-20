@@ -205,7 +205,6 @@ func main() {
             log.Println(err)
             break
           }
-					fmt.Println(systemState)
           newOrders, hallLights, err:= order_handler.HandleSystemStateFromMaster(systemState)
 					if err != nil {
 						log.Println(err)

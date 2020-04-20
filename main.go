@@ -184,7 +184,7 @@ func main() {
 					break
 				}
 
-				unassignedRequests, _, err := order_handler.HandleStateFromSlave(slaveState)
+				unassignedRequests, err := order_handler.HandleStateFromSlave(slaveState)
 				if err != nil {
 					log.Println(err)
 				}
@@ -201,7 +201,7 @@ func main() {
 						drv_order <- req
 					}
 				}
-				hallLights, err := elevstate.GetHallLights()
+				hallLights, err = order_handler.GetHallLights()
 				if err != nil {
 					log.Println(err)
 					break

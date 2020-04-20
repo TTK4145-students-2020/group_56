@@ -1,22 +1,18 @@
 package order_handler
 
-import "../elevio"
-import "../requests"
-import "../fsm"
-import "../elevator"
-import "../timer"
-import "../elevstate"
-import "math"
+import (
+    "math"
+
+    "../elevio"
+    "../requests"
+    "../fsm"
+    "../elevator"
+    "../timer"
+    "../elevstate"
+)
 
 // se på SystemState.json, cleare gamle unassignedRequests, extract nye ordre
-func handleSystemStateFromMaster() (newOrders []elevio.ButtonEvent) {
-  systemState, err := elevstate.RetrieveSystemState()
-  
-  if err != nil {
-    log.Println(err)
-    return
-  }
-  
+func HandleSystemStateFromMaster(systemState elevstate.SystemState) (newOrders []elevio.ButtonEvent, hallLights [4][2]bool, err error) {
   localState, err := elevstate.RetrieveState()
   
   if err != nil {
@@ -47,19 +43,40 @@ func handleSystemStateFromMaster() (newOrders []elevio.ButtonEvent) {
     }
   }
   
-  // Extract nye ordre
-  newOrders = remoteState.newOrders // så enkelt ? 
+  // Extract nye ordre og hallLights
+  newOrders = remoteState.newOrders
+  hallLights = systemState.hallLights
+  
   //remoteState.newOrders = []
   //localState.NewOrders = append(localState.NewOrders, newOrders...)
   localState.NewOrders = newOrders
   
   // Lagre State
-  elevstate.StateStore(localState)
+  err = elevstate.StateStore(localState)
   // Tenker da ikke å sende state tilbake til master med en gang, etter som det vil gjøres når chaffeur tar imot de nye ordrene
+  if err != nil {
+      fmt.Println(err)
+      return
+  }
+}
+
+func updateHallLights(systemState elevstate.SystemState) (hallLights [4][2]bool) {
+    for f := 0; f < elevator.NumFloors; f++ {
+        btnTypes := []elevio.ButtonType{elevio.BT_HallUp, elevio.BT_HallDown}
+        for bt := range btnTypes {
+            for state := range systemState.states {
+                if state.Requests[f][bt] {
+                    hallLights[f][bt] = true
+                    break
+                }
+                hallLights[f][bt] = false
+            }
+        }
+    }
 }
 
 // ta inn staten til slaven som string (json), cleare newOrder i SystemState.json, se etter unassigned hos alle slaver
-func handleStateFromSlave(slaveState elevstate.State) (unassignedRequests []elevio.ButtonEvent) {
+func HandleStateFromSlave(slaveState elevstate.State) (unassignedRequests []elevio.ButtonEvent, hallLights [4][2]bool, err error) {
   systemState, err := elevstate.RetrieveSystemState()
   
   if err != nil {
@@ -91,12 +108,15 @@ func handleStateFromSlave(slaveState elevstate.State) (unassignedRequests []elev
   }
   
   unassignedRequests = slaveState.unassignedRequests
+
+  hallLights = updateHallLights(systemState)
+  systemState.HallLights = hallLights
   
   systemState.states[systemIndex].unassignedRequests = unassignedRequests
   systemState.states[systemIndex].Floor = slaveState.Floor
   systemState.states[systemIndex].Dirn = slaveState.Dirn
   systemState.states[systemIndex].Requests = slaveState.Requests
-  
+
   err = elevstate.SystemStore(systemState)
   
   if err != nil {
@@ -104,17 +124,47 @@ func handleStateFromSlave(slaveState elevstate.State) (unassignedRequests []elev
   }
 }
 
-func AssignNewOrder(newRequest elevio.ButtonEvent) {
+// lagre ny request i unassignedRequest
+func NewRequest(request elevio.ButtonEvent) (err error) {
+    localState, err := elevstate.RetrieveState()
+
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+
+    localState.unassignedRequest = append(localState.unassignedRequest, request)
+
+    err = elevstate.StateStore(localState)
+
+    if err != nil {
+        log.Println(err)
+        return
+    }
+}
+
+func AssignNewOrder(masterID string, newRequest elevio.ButtonEvent) (toMaster bool, hallLights [4][2]bool, err error) {
   
   systemState, err := elevstate.RetrieveSystemState()
+
+  if err != nil [
+      log.Println(err)
+  ]
   
   bestIndex := findBestElevIndex(newRequest, systemState.states)
   
   systemState.states[bestIndex].newOrders = append(systemState.states[bestIndex].newOrders, newRequest)
   
   systemState.HallLights[newRequest.Floor][newRequest.Button] = true
+
+  toMaster = systemState.states[bestIndex].ID == masterID
+  hallLights = systemState.HallLights
   
   err = elevstate.SystemStore(systemState)
+
+  if err != nil {
+      log.Println(err)
+  }
 }
 
 func findBestElevIndex(hallBtn elevio.ButtonEvent , states []elevstate.State  ) int { 

@@ -29,6 +29,14 @@ func FsmInit() {
 	}
 } */
 
+func IndependentLights() {
+	for f := 0; f < elevator.NumFloors; f++ {
+		for btn := 0; btn < elevator.NumButtons; btn++ {
+			elevio.SetButtonLamp(elevio.ButtonType(btn), f, elev.Requests[f][btn])
+		}
+	}
+}
+
 func setCabLights(e elevator.Elevator) {
 	for f := 0; f < elevator.NumFloors; f++ {
 		elevio.SetButtonLamp(elevio.BT_Cab, f, e.Requests[f][2])

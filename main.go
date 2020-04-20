@@ -33,16 +33,6 @@ var (
 	// numFloors = flag.Int("n", 4, "The number of floors.")
 )
 
-/*
-type OperatingMode int
-
-const (
-	OM_Master operatingMode = iota
-	OM_Slave
-	OM_Independent
-)
-*/
-
 func main() {
 	flag.Parse()
 	if *isBackup {
@@ -98,10 +88,10 @@ func main() {
 			}
 			// Hvis hall-call, switch mode
 			switch mode {
-			case OM_Independent:
+			case network.OM_Independent:
 				// gi seg selv ordre
 				drv_order <- e
-			case OM_Master:
+			case network.OM_Master:
 				// delegere ordre
 				toMaster, hallLights := order_handler.AssignNewOrder(*port, e)
 				if toMaster {
@@ -109,7 +99,7 @@ func main() {
 				}
 				drv_hallLights <- hallLights
 				net_sendState <- true
-			case OM_Slave:
+			case network.OM_Slave:
 				// sende til master for delegering
 				order_handler.NewRequest(e)
 				net_sendState <- true
@@ -119,9 +109,9 @@ func main() {
 
 		case e := <-event_localStateChange:
 			switch mode {
-			case OM_Independent:
+			case network.OM_Independent:
 				break
-			case OM_Master:
+			case network.OM_Master:
 				// Sende til slaver
 				statebytes, err := elevstate.RetrieveStateBytes()
 				if err != nil {
@@ -130,7 +120,7 @@ func main() {
 				}
 				elevstate.SystemStateUpdate(statebytes)
 				net_sendState <- true
-			case OM_Slave:
+			case network.OM_Slave:
 				net_sendState <- true
 			default:
 				break
@@ -138,10 +128,10 @@ func main() {
 
 		case e := <-event_networkMessage:
 			switch mode {
-			case OM_Independent:
+			case network.OM_Independent:
 				fmt.Println("WTF IS GOING ON!?!")
 				break
-			case OM_Master:
+			case network.OM_Master:
 				// Antar state fra slave
 				slaveState, err := elevstate.StateFromBytes(e)
 
@@ -160,7 +150,7 @@ func main() {
 				drv_hallLights <- hallLights
 				net_sendState <- true
 
-			case OM_Slave:
+			case network.OM_Slave:
 				// Antar SystemState fra master
 				systemState, err := elevstate.SystemStateFromBytes(e)
 

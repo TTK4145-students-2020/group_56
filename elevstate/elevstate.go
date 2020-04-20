@@ -22,7 +22,7 @@ type Lights struct{
 
 type System struct{
   HallLights [4][2]bool
-  states []State `json:"States"`
+  States []State `json:"States"`
 }
 
 // legg til neworders og unassignedrequests (type: elevio.buttonevent)
@@ -84,7 +84,7 @@ func StateStoreElev(e elevator.Elevator, newRequests []elevio.ButtonEvent) (erro
   }
 
   state.Floor = e.Floor
-  state.Dirn = dirToString(e.Dirn)
+  state.Dirn = DirToString(e.Dirn)
   state.Requests = e.Requests
 
   var existance bool
@@ -170,14 +170,14 @@ func SystemStateUpdate(statebytes []byte) (error){
   }
 
   existance := false
-  for i := 0; i < len(system.states); i++ {
-    if(system.states[i].ID == state.ID){
-      system.states[i] = state
+  for i := 0; i < len(system.States); i++ {
+    if(system.States[i].ID == state.ID){
+      system.States[i] = state
       existance = true
     }
   }
   if(!existance){
-    system.states = append(system.states, state)
+    system.States = append(system.States, state)
   }
 
   err = SystemStore(system)
@@ -209,7 +209,7 @@ func StateRestore() (elevator.Elevator, error) {
   }
 
   e.Floor = state.Floor
-  e.Dirn = stringToDir(state.Dirn)
+  e.Dirn = StringToDir(state.Dirn)
   e.Requests = state.Requests
   e.State = elevator.EBIdle
   e.Config.ClearRequestVariant = elevator.CVALL
@@ -217,7 +217,7 @@ func StateRestore() (elevator.Elevator, error) {
   return e, nil
 }
 
-func dirToString(dirn elevio.MotorDirection) (dirnS string){
+func DirToString(dirn elevio.MotorDirection) (dirnS string){
   switch dirn {
   case elevio.MD_Up:
     dirnS = "MD_Up"
@@ -232,7 +232,7 @@ func dirToString(dirn elevio.MotorDirection) (dirnS string){
   return
 }
 
-func stringToDir(dirnS string) (dirn elevio.MotorDirection){
+func StringToDir(dirnS string) (dirn elevio.MotorDirection){
   switch dirnS {
   case "MD_Up":
     dirn = elevio.MD_Up
@@ -307,9 +307,9 @@ func RetrieveRemoteStateBytes(port string) ([]byte, error){
   // if err != nil {
   //     return nil, err
   // }
-  for i := 0; i < len(system.states); i++ {
-    if(system.states[i].ID == port){
-      statebytes, err := json.Marshal(system.states[i])
+  for i := 0; i < len(system.States); i++ {
+    if(system.States[i].ID == port){
+      statebytes, err := json.Marshal(system.States[i])
       return statebytes, err
     }
   }
@@ -377,8 +377,8 @@ func marshalSystem(system System) ([]byte) {
   systemBytes, _ = json.Marshal(Lights{system.HallLights})
   systemBytes = append(systemBytes, []byte("||")...)
 
-  for i := 0; i < len(system.states); i++ {
-    statebytes, err := json.Marshal(system.states[i])
+  for i := 0; i < len(system.States); i++ {
+    statebytes, err := json.Marshal(system.States[i])
     if err == nil {
       systemBytes = append(systemBytes, statebytes...)
       systemBytes = append(systemBytes, []byte("||")...)
@@ -401,7 +401,7 @@ func UnmarshalSystem(systemBytes []byte) (System){
     var state State
     err := json.Unmarshal(allstates[i], &state)
     if err == nil {
-      system.states = append(system.states, state)
+      system.States = append(system.States, state)
     }
   }
   return system

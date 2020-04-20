@@ -8,10 +8,10 @@ import (
 	"../timer"
 )
 
-func Chaffeur(event_localRequest chan<- elevio.ButtonEvent, event_stateChange chan<- struct{}, drv_order <-chan elevio.ButtonEvent, drv_hallLights <-chan [4][2]bool) {
+func Chaffeur(event_localRequest chan<- elevio.ButtonEvent, event_stateChange chan<- struct{}, drv_order <-chan elevio.ButtonEvent, drv_hallLights <-chan [4][2]bool, port string) {
 	numFloors := 4
 
-	elevio.Init("localhost:15657", numFloors)
+	elevio.Init(port, numFloors)
 
 	drv_floors := make(chan int)
 	drv_timeout := make(chan bool)
@@ -44,7 +44,7 @@ func Chaffeur(event_localRequest chan<- elevio.ButtonEvent, event_stateChange ch
 		}
 
 		fsm.TransmitState()
-		event_stateChange <- struct{}
+		event_stateChange <- struct{}{}
 
 		time.Sleep(20 * time.Millisecond)
 	}

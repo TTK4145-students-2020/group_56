@@ -48,13 +48,13 @@ const stateDeadline = 100
 const keepSlave = 250
 
 
-const bcPort = 15658
+const bcPort = 15660
 
 //var mux sync.Mutex
 
 func Network(port string, priority int, modeChan chan<- OperatingMode, sigSend <-chan bool, sigReceived chan<-[]byte){
 	var conn *net.TCPConn
-	var mode OperatingMode
+	mode := OM_Independent
 	var IPorPort string
 
 	myIP, err := localip.LocalIP()

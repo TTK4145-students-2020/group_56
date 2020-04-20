@@ -40,20 +40,3 @@ func PollTimer(receiver chan<- bool) {
 		prev = v
 	}
 }
-
-// func NetworkTimer(reset <-chan bool, timeout chan<- bool, sec float64){
-// 	for{
-// 		select{
-// 		case a := <-reset:
-// 			if(a){
-// 				continue
-// 			}else{
-// 				return
-// 			}
-//
-// 		case <-time.After(time.Duration(sec)*1000*time.Millisecond):
-// 			timeout<-true
-// 			return
-// 		}
-// 	}
-// }

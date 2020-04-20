@@ -14,6 +14,11 @@ var elev elevator.Elevator
 
 func FsmInit() {
 	elev = elevator.Uninitialized()
+	oldElev, err := elevstate.StateRestore()
+	if err != nil {
+		return
+	}
+	elev.Requests = oldElev.Requests
 }
 
 /* func setAllLights(e elevator.Elevator) {

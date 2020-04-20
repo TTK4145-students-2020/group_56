@@ -191,13 +191,11 @@ func StateRestore() (elevator.Elevator, error) {
   }
 
   statebytes, err := ioutil.ReadAll(jsonFile)
-  if err != nil {
-    jsonFile.Close()
-    mux.Unlock()
-    return e, err
-  }
   jsonFile.Close()
   mux.Unlock()
+  if err != nil {
+    return e, err
+  }
 
   var state State
   err = json.Unmarshal(statebytes, &state)

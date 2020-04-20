@@ -1,41 +1,36 @@
 package main
 
 // TODO: endre navn fra requests til orders i elevator/elevator.go
-// TODO: muligens endre navn på elevstate.og til noe minnegreier
+// TODO: muligens endre navn på elevstate.go til noe minnegreier
+// TODO: Initialisere elevator.Elevator med requests fra fil
+// TODO: Skru av hallLights i handleStateFromSlave
+// TODO: Håndtere hallLights når heisen er independent
+// TODO: AssignNewOrder - si ifra hvis master får order
+// TODO: AssignNewOrder - returnere hallLights
+// TODO: order_handler.NewRequest - denne funksjonen må lages
+// TODO: elevstates.StateFromBytes - må lages
+// TODO: elevstates.SystemStateFromBytes - må lages
+// TODO: HandleSystemStateFromMaster - må returnere hallLights
 
 import (
-	 "fmt"
-	"time"
-	//"net"
-
-		"./elevio"
-	//	"./fsm"
-	//	"./timer"
-
 	"flag"
-
-	// "./backup"
-	// "./chaffeur"
-	"./network"
-	"./elevstate"
-	// "os"
-	// "io/ioutil"
+	"fmt"
 	"log"
-	// "strconv"
+
+	"./backup"
+	"./chaffeur"
+	"./elevio"
+	"./elevstate"
+	"./network"
+	"./order_handler"
 )
-/*
+
 var (
 	isBackup    = flag.Bool("backup", false, "Starts process as backup.")
 	primaryPort = flag.Int("cbport", 0, "The port backup should dial to reach primary.")
+	priority    = flag.Int("priority", 1, "The priority when deciding master.")
+	port        = flag.String("port", ":0", "The port used when slave.")
 	// numFloors = flag.Int("n", 4, "The number of floors.")
-)
-
-type operatingMode int
-
-const (
-	OM_Master operatingMode = iota
-	OM_Slave
-	OM_Independent
 )
 
 func main() {
@@ -46,12 +41,13 @@ func main() {
 	backup.Launch()
 
 	// Initialisere state, enten fra fil eller fra scratch
+	elevstate.StateInit(*port)
 
 	// Lage kanaler for events som main må ta seg av
-	event_switchMode := make(chan operatingMode)
-	event_request := make(chan elevio.ButtonEvent)
-	event_order := make(chan order_handler.Order)
-	event_stateChange := make(chan struct{})
+	event_switchMode := make(chan network.OperatingMode)
+	event_localRequest := make(chan elevio.ButtonEvent)
+	event_localStateChange := make(chan struct{}) // Senere: Heller chan elevator.Elevator, og så lagre state fra main ?
+	event_networkMessage := make(chan []byte)
 
 	// Request er ikke delegert, må delegeres av master
 	// Order er delegert av master, må betjenes av heisen
@@ -59,45 +55,132 @@ func main() {
 	drv_order := make(chan elevio.ButtonEvent)
 	drv_hallLights := make(chan [4][2]bool)
 
+	net_sendState := make(chan bool) // Senere: chan struct{}
+
 	// Initialisere nettverk og kjøring av heis
 	go chaffeur.Chaffeur(event_localRequest, event_stateChange, drv_order, drv_hallLights) // ??
-	go network.Network(event_switchMode)                                                   // ??
-
+	go network.Network(*port, *priority, event_switchMode, net_sendState, event_networkMessage)
 	// Eller, blokkerende init-funksjoner som selv starter goroutiner ?
 	// For å sikre at modulene er klare før vi begynner på for-select loopen
 
 	// Anta mode independent
-	mode := OM_Independent
+	mode := network.OM_Independent
 
 	// For select hvor vi tar det som det kommer
 	for {
 		select {
 		case e := <-event_switchMode:
 			mode = e
+			if e == network.OM_Master {
+				err := elevstate.SystemInit()
+				if err != nil {
+					log.Println(err)
+					break
+				}
+			}
+			// Hvis independent må hallLights oppdateres
+
 		case e := <-event_localRequest:
 			// Hvis cab-call, delegere til seg selv og sende state til network
+			if e.Button == elevio.BT_Cab { // Senere: Skal vi sende til main hvis det er cab?
+				drv_order <- e
+				break
+			}
 			// Hvis hall-call, switch mode
 			switch mode {
-			case OM_Independent:
+			case network.OM_Independent:
 				// gi seg selv ordre
-			case OM_Master:
+				drv_order <- e
+			case network.OM_Master:
 				// delegere ordre
-			case OM_Slave:
+				toMaster, hallLights := order_handler.AssignNewOrder(*port, e)
+				if toMaster {
+					drv_order <- e
+				}
+				drv_hallLights <- hallLights
+				net_sendState <- true
+			case network.OM_Slave:
 				// sende til master for delegering
+				order_handler.NewRequest(e)
+				net_sendState <- true
+			default:
+				break
 			}
-		case e := <-event_stateChange:
+
+		case e := <-event_localStateChange:
 			switch mode {
-			case OM_Independent:
-				// ingenting?
-			case OM_Master:
+			case network.OM_Independent:
+				break
+			case network.OM_Master:
 				// Sende til slaver
-			case OM_Slave:
-				// Sende til master
+				statebytes, err := elevstate.RetrieveStateBytes()
+				if err != nil {
+					log.Println(err)
+					break
+				}
+				elevstate.SystemStateUpdate(statebytes)
+				net_sendState <- true
+			case network.OM_Slave:
+				net_sendState <- true
+			default:
+				break
+			}
+
+		case e := <-event_networkMessage:
+			switch mode {
+			case network.OM_Independent:
+				fmt.Println("WTF IS GOING ON!?!")
+				break
+			case network.OM_Master:
+				// Antar state fra slave
+				slaveState, err := elevstate.StateFromBytes(e)
+
+				if err != nil {
+					log.Println(err)
+					break
+				}
+
+				unassignedRequests := order_handler.HandleStateFromSlave(slaveState)
+				for req := range unassignedRequests {
+					toMaster, hallLights := order_handler.AssignNewOrder(*port, req)
+					if toMaster {
+						drv_order <- req
+					}
+				}
+				drv_hallLights <- hallLights
+				net_sendState <- true
+
+			case network.OM_Slave:
+				// Antar SystemState fra master
+				systemState, err := elevstate.SystemStateFromBytes(e)
+
+				if err != nil {
+					log.Println(err)
+					break
+				}
+
+				err = elevstate.SystemStore(systemState)
+
+				if err != nil {
+					log.Println(err)
+					break
+				}
+
+				newOrders, hallLights := order_handler.HandleSystemStateFromMaster(systemState)
+
+				drv_hallLights <- hallLights
+
+				for order := range newOrders {
+					drv_order <- order
+				}
+
+			default:
+				break
 			}
 		}
 	}
 }
-*/
+
 /*func main() {
 	fmt.Println("Started!")
 
@@ -333,7 +416,7 @@ func main(){
 	}
 }
 */
-
+/*
 func main() {
 	var port string
 	var priority int
@@ -405,3 +488,4 @@ func main() {
 		fmt.Println(mode)
 	}
 }
+*/

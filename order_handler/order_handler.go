@@ -74,7 +74,13 @@ func updateHallLights(systemState elevstate.System) (hallLights [4][2]bool) {
 }
 
 // må ta hensysn til Requests, newOrders og unassignedRequests
-func GetHallLights(systemState elevstate.System) (hallLights [4][2]bool) {
+func GetHallLights() (hallLights [4][2]bool, err error) {
+	systemState, err := elevstate.RetrieveSystemState()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
 	// first, requests
 	for f := 0; f < elevator.NumFloors; f++ {
 		btnTypes := []elevio.ButtonType{elevio.BT_HallUp, elevio.BT_HallDown}
@@ -96,11 +102,17 @@ func GetHallLights(systemState elevstate.System) (hallLights [4][2]bool) {
 			hallLights[nor.Floor][nor.Button] = true
 		}
 	}
+
+	err = elevstate.SystemStore(systemState)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 	return
 }
 
 // ta inn staten til slaven som string (json), cleare newOrder i SystemState.json, se etter unassigned hos alle slaver
-func HandleStateFromSlave(slaveState elevstate.State) (unassignedRequests []elevio.ButtonEvent, hallLights [4][2]bool, err error) {
+func HandleStateFromSlave(slaveState elevstate.State) (unassignedRequests []elevio.ButtonEvent, err error) {
 	systemState, err := elevstate.RetrieveSystemState()
 
 	if err != nil {
@@ -134,9 +146,6 @@ func HandleStateFromSlave(slaveState elevstate.State) (unassignedRequests []elev
 
 	unassignedRequests = slaveState.NewRequests
 
-	hallLights = GetHallLights(systemState)
-	systemState.HallLights = hallLights
-
 	systemState.States[systemIndex].NewRequests = unassignedRequests
 	systemState.States[systemIndex].Floor = slaveState.Floor
 	systemState.States[systemIndex].Dirn = slaveState.Dirn
@@ -169,7 +178,7 @@ func NewRequest(request elevio.ButtonEvent) (err error) {
 	return
 }
 
-func AssignNewOrder(masterID string, newRequest elevio.ButtonEvent) (toMaster bool, hallLights [4][2]bool, err error) {
+func AssignNewOrder(masterID string, newRequest elevio.ButtonEvent) (toMaster bool, err error) {
 
 	systemState, err := elevstate.RetrieveSystemState()
 
@@ -180,9 +189,6 @@ func AssignNewOrder(masterID string, newRequest elevio.ButtonEvent) (toMaster bo
 	bestIndex := findBestElevIndex(newRequest, systemState.States)
 
 	systemState.States[bestIndex].NewOrders = append(systemState.States[bestIndex].NewOrders, newRequest)
-
-	hallLights = GetHallLights(systemState)
-	systemState.HallLights = hallLights
 
 	toMaster = systemState.States[bestIndex].ID == masterID
 

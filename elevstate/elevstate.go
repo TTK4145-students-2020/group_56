@@ -20,11 +20,16 @@ type System struct{
     states []State `json:"States"`
 }
 
+// legg til neworders og unassignedrequests (type: elevio.buttonevent)
+
 type State struct{
-  ID        string `json:"ID"`
-  Floor     int `json:"Pos"`
-  Dirn      string `json:"Dirn"`
-  Requests  [4][3]bool `json:"Requests"`
+  ID          string `json:"ID"`
+  Floor       int `json:"Pos"`
+  Dirn        string `json:"Dirn"`
+  Requests    [4][3]bool `json:"Requests"`
+
+  NewOrders   []elevio.ButtonEvent `json:"NewOrders"`
+  NewRequests []elevio.ButtonEvent `json:"NewRequests"`
 }
 
 var mux sync.Mutex
@@ -35,6 +40,9 @@ const syspath = "./elevstate/systemState.json"
 // Must be called from main, updates or generates state
 func StateInit(port string) (error) {
   var requests [4][3]bool
+  var newOrders []elevio.ButtonEvent
+  var newRequests []elevio.ButtonEvent
+
   for i := 0; i < 4; i++ {
     for j := 0; j < 3; j++ {
       requests[i][j] = false
@@ -46,6 +54,8 @@ func StateInit(port string) (error) {
     Floor: -1,
     Dirn: "",
     Requests: requests,
+    NewOrders: newOrders,
+    NewRequests: newRequests,
   }
 
   err := genStateFile(state)
@@ -62,16 +72,32 @@ func SystemInit() (error) {
 }
 
 // stores e as a state.Json file
-func StateStoreElev(port string, e elevator.Elevator) (error){
-  state := State{
-    ID: port,
-    Floor: e.Floor,
-    Dirn: dirToString(e.Dirn),
-    Requests: e.Requests,
+func StateStoreElev(e elevator.Elevator, newRequests []elevio.ButtonEvent) (error){
+  state, err := RetrieveState()
+  if err != nil {
+    return err
+  }
+
+  state.Floor = e.Floor
+  state.Dirn = dirToString(e.Dirn)
+  state.Requests = e.Requests
+
+  var existance bool
+  for _, request := range newRequests {
+    existance = false
+    for _, old := range state.NewRequests {
+      if request == old {
+        existance = true
+        continue
+      }
+    }
+    if (!existance) {
+      state.NewRequests = append(state.NewRequests, request)
+    }
   }
 
   var jsonData []byte
-  jsonData, err := json.Marshal(state)
+  jsonData, err = json.Marshal(state)
   if err != nil {
       return err
   }
@@ -362,6 +388,7 @@ func marshalSystem(system System) ([]byte) {
   }
   return systemBytes
 }
+
 func unmarshalSystem(systemBytes []byte) (System){
   var system System
   allstates := bytes.Split(systemBytes, []byte("||"))
@@ -374,6 +401,21 @@ func unmarshalSystem(systemBytes []byte) (System){
     }
   }
   return system
+}
+
+func RetrieveSystemState() (System, error){
+  systembytes, err := RetrieveSystemStateBytes()
+  system := unmarshalSystem(systembytes)
+  return system, err
+
+}
+
+func RetrieveState() (State, error){
+  var state State
+  statebytes, err := RetrieveStateBytes()
+  err = json.Unmarshal(statebytes, &state)
+  return state, err
+
 }
 
 /*

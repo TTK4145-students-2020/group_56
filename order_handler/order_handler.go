@@ -25,7 +25,7 @@ type Order struct {
 
 
 func DelegateOrder(elevID string, btn chan<- elevio.ButtonEvent,  assignedOrder <-chan Order){ //skal sende ordren til den valgte heisen enten lokalt (til master) eller over nettet (til en slave)
-    netSend := make(chan Order) 
+    netSend := make(chan Order)
     netRecv := make(chan Order)
 
     //TODO: legge til hvordan kanalene sendes over nettet
@@ -35,7 +35,7 @@ func DelegateOrder(elevID string, btn chan<- elevio.ButtonEvent,  assignedOrder 
     for{
 
         select{
-        
+
         case orderReceived := <- assignedOrder:
 
             if btn! =2 { //ikke cabcall
@@ -60,11 +60,11 @@ func DelegateOrder(elevID string, btn chan<- elevio.ButtonEvent,  assignedOrder 
 
     }*/
 
-	
+
 
 }
 
-func AssignNewOrder(elevID string, buttonPressed <- chan elevio.ButtonEvent, allStates <-chan map[string]elevator.Elevator, peerUpdate <-chan peers.PeerUpdate, assignedOrder chan Order) 
+func AssignNewOrder(elevID string, buttonPressed <- chan elevio.ButtonEvent, allStates <-chan map[string]elevator.Elevator, peerUpdate <-chan peers.PeerUpdate, assignedOrder chan Order)
 // skal registrere en ny ordre og finne den beste heisen for denne ordren
 
 var activeElevators []string
@@ -81,7 +81,7 @@ var states map[string]elevator.Elevator
         case newElevator := <- elevatorUpdate:
             activeElevators = newElevator.Peers
 
-        
+
         case btn := <- buttonPressed:
 
             currentStates := make(map[string]elevator.Elevator)
@@ -91,7 +91,7 @@ var states map[string]elevator.Elevator
                     currentStates[id] = state
                 }
             }
-        
+
             bestElev := findBestElev(btn, elevID, currentStates )
 
             newOrder := Order{btn.Floor, btn.Button, bestElev}
@@ -111,7 +111,7 @@ var states map[string]elevator.Elevator
 func findBestElev(hallBtn elevio.ButtonEvent , elevID string, states map[string]elevator.Elevator  ){ //finner den beste heisen ut i fra kostfunksjonen
 
 	bestTime := math.MaxInt64
-	bestElev := elevID 
+	bestElev := elevID
 
 	for id, state := range states {//går gjennom alle states til hver elevID
         state.Requests[btn.Floor][btn.Button] = 2
@@ -133,12 +133,12 @@ func timeToIdle(e elevator.Elevator) int {//finner tiden det tar før heisen er 
     D_Stop := elevio.MD_Stop
 
     duration := 0;
-    
+
     switch e.State {
     case elevator.EB_Idle:
         e.Dirn = requests.ChooseDirection(e);
         if e.dirn == D_Stop {
-            return duration; //returnerer fordi heisen idle = "fri" 
+            return duration; //returnerer fordi heisen idle = "fri"
         }
         break;
 
@@ -177,4 +177,3 @@ func jsonToStateMap(elevID string) (states map[string]elevator.Elevator){
     return e
 
   }
-

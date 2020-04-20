@@ -14,17 +14,16 @@ import (
 
 	"flag"
 
-	"./backup"
-	"./chaffeur"
+	// "./backup"
+	// "./chaffeur"
 	"./network"
 	"./elevstate"
 	// "os"
 	// "io/ioutil"
 	"log"
 	// "strconv"
-	"flag"
 )
-
+/*
 var (
 	isBackup    = flag.Bool("backup", false, "Starts process as backup.")
 	primaryPort = flag.Int("cbport", 0, "The port backup should dial to reach primary.")
@@ -98,7 +97,7 @@ func main() {
 		}
 	}
 }
-
+*/
 /*func main() {
 	fmt.Println("Started!")
 
@@ -334,3 +333,60 @@ func main(){
 	}
 }
 */
+
+func main() {
+	var port string
+	var priority int
+	mode := "independent"
+
+	flag.StringVar(&port, "port", ":12345", "This elevator's unique port")
+	flag.IntVar(&priority, "priority", 1, "This elevator's priority")
+	flag.Parse()
+
+	if port[0] != ':' {
+		port = ":"+port
+	}
+	if len(port) > 6 {
+		fmt.Println("Invalid port")
+		return
+	}
+
+	modeCh := make(chan string)
+	send := make(chan bool)
+	receive := make(chan []byte)
+
+	err := elevstate.StateInit(port)
+	if err != nil {
+		fmt.Println("Error initializing state:")
+		log.Println(err)
+	}
+	go network.Network(port, priority, modeCh, send, receive)
+
+	for{
+		for start := time.Now(); time.Since(start) < 1*time.Second; {
+			select{
+			case mode = <-modeCh:
+				fmt.Println("This elevator is now", mode)
+				if mode == "master" {
+					err = elevstate.SystemInit()
+					if err != nil {
+						log.Println(err)
+					}
+				}
+
+			case a := <-receive:
+				fmt.Println("State Received")
+				switch(mode){
+				case "master":
+					network.ReceiveState(a, true)
+				case "slave":
+					network.ReceiveState(a, false)
+				default:
+					break
+				}
+			}
+		}
+		send <-true
+		fmt.Println(mode)
+	}
+}

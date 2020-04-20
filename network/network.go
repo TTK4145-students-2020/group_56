@@ -3,6 +3,7 @@ package network
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // TODO: gå over og tune alle tider (deadline, timeouts, etc)
+// TODO: endre statemottak til å sende unmarshalled state via kanal til master
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 import (
@@ -43,7 +44,7 @@ const bcPort = 15657
 
 //var mux sync.Mutex
 
-func Network(port string, priority int, modeChan chan<- string, sigSend <-chan bool, sigReceived chan<-bool){
+func Network(port string, priority int, modeChan chan<- string, sigSend <-chan bool, sigReceived chan<-[]byte){
 	var conn *net.TCPConn
 	var mode string
 	var IPorPort string
@@ -142,7 +143,7 @@ func independentNetwork(port string, IP string, priority int, BCChan chan<- Msgs
 
 }
 
-func masterNetwork(firstConn *net.TCPConn, firstport string, masterIP string, BCChan chan<- Msgstruct, LChan <-chan Msgstruct, sigSend <-chan bool, sigReceived chan<-bool) (string){
+func masterNetwork(firstConn *net.TCPConn, firstport string, masterIP string, BCChan chan<- Msgstruct, LChan <-chan Msgstruct, sigSend <-chan bool, sigReceived chan<-[]byte) (string){
 	slavemap := make(map[string]slaveConn)
 
 	var  firstslave slaveConn
@@ -154,21 +155,21 @@ func masterNetwork(firstConn *net.TCPConn, firstport string, masterIP string, BC
 
 	newslave := false
 
-	stateReceiver			:= make(chan []byte)
+	// stateReceiver			:= make(chan []byte)
 	slaveport 				:= make(chan string)
 	BCkill 						:= make(chan bool)
 	listenkill				:= make(chan bool)
 
 	go broadcast(masterIP, BCChan, BCkill)
 	go listenForMsg(slaveport, nil, LChan, listenkill)
-	go listenForState(slavemap[firstport].conn, stateReceiver, slavemap[firstport].killread)
+	go listenForState(slavemap[firstport].conn, sigReceived, slavemap[firstport].killread)
 
 	for start := time.Now(); time.Since(start) < time.Duration(cycleTime)*time.Millisecond;{
 		select{
 		case a:= <-slaveport:
 			slavemap, newslave = slavemapHandler(slavemap, a)
 			if newslave {
-				go listenForState(slavemap[a].conn, stateReceiver, slavemap[a].killread)
+				go listenForState(slavemap[a].conn, sigReceived, slavemap[a].killread)
 			}
 			newslave = false
 
@@ -177,11 +178,11 @@ func masterNetwork(firstConn *net.TCPConn, firstport string, masterIP string, BC
 				go sendState(slave.conn, true)
 			}
 
-		case a := <-stateReceiver:
-			go receiveState(a, true)
-			// Choose one of these
-			sigReceived <-true
-			// go func(){sigReceived <-true}()
+		// case a := <-stateReceiver:
+		// 	go receiveState(a, true)
+		// 	// Choose one of these
+		// 	sigReceived <-true
+		// 	// go func(){sigReceived <-true}()
 
 
 		default:
@@ -200,8 +201,8 @@ func masterNetwork(firstConn *net.TCPConn, firstport string, masterIP string, BC
 	return "independent"
 }
 
-func slaveNetwork(conn *net.TCPConn, port string, masterIP string, BCChan chan<- Msgstruct, LChan <-chan Msgstruct, sigSend <-chan bool, sigReceived chan<-bool) (string){
-	stateReceiver 	:= make(chan []byte, 2)
+func slaveNetwork(conn *net.TCPConn, port string, masterIP string, BCChan chan<- Msgstruct, LChan <-chan Msgstruct, sigSend <-chan bool, sigReceived chan<-[]byte) (string){
+	// stateReceiver 	:= make(chan []byte, 2)
 	ipmsg 					:= make(chan string)
 	BCkill 					:= make(chan bool)
 	listenkill 			:= make(chan bool)
@@ -209,7 +210,7 @@ func slaveNetwork(conn *net.TCPConn, port string, masterIP string, BCChan chan<-
 
 	go broadcast(port, BCChan, BCkill)
 	go listenForMsg(nil, ipmsg, LChan, listenkill)
-	go listenForState(conn, stateReceiver, readkill)
+	go listenForState(conn, sigReceived, readkill)
 
 
 	for start := time.Now(); time.Since(start) < time.Duration(cycleTime)*time.Millisecond;{
@@ -222,11 +223,11 @@ func slaveNetwork(conn *net.TCPConn, port string, masterIP string, BCChan chan<-
 		case <-sigSend:
 			go sendState(conn, false)
 
-		case a := <-stateReceiver:
-			go receiveState(a, false)
-			// Choose one of these
-			sigReceived <-true
-			// go func(){sigReceived <-true}()
+		// case a := <-stateReceiver:
+		// 	go receiveState(a, false)
+		// 	// Choose one of these
+		// 	sigReceived <-true
+		// 	// go func(){sigReceived <-true}()
 
 		default:
 			break
@@ -449,7 +450,7 @@ func sendState(conn *net.TCPConn, isMaster bool){
 	return
 }
 
-func receiveState(state []byte, isMaster bool){
+func ReceiveState(state []byte, isMaster bool){
 
 	if isMaster {
 		// Master updates entire system state
